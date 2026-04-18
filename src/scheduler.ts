@@ -45,6 +45,12 @@ export function startScheduler(config: TelecronConfig) {
   
   for (const jobName of jobs) {
     const jobConfig = config.jobs[jobName];
+    
+    if (jobConfig.enabled === false) {
+      console.log(pc.yellow(`[Skip] Job '${jobName}' is currently disabled.`));
+      continue;
+    }
+
     if (!jobConfig.schedule) {
       console.log(pc.yellow(`[Skip] Job '${jobName}' has no schedule defined.`));
       continue;
@@ -63,14 +69,21 @@ export function startScheduler(config: TelecronConfig) {
       continue;
     }
 
+    const scheduleOpts: any = {};
+    const tz = jobConfig.timezone || config.timezone;
+    if (tz) {
+        scheduleOpts.timezone = tz;
+    }
+
     cron.schedule(cronExpression, async () => {
       try {
         await runJob(jobName, jobConfig, notifier);
       } catch (err: any) {
         console.error(pc.red(`Unhandled error in job scheduler for ${jobName}: ${err.message}`));
       }
-    });
+    }, scheduleOpts);
 
-    console.log(pc.cyan(`⏱ Scheduled [${pc.bold(jobName)}] runs at: ${cronExpression} (Rule: "${jobConfig.schedule}")`));
+    const tzLabel = tz ? ` (${tz})` : ' (System Time)';
+    console.log(pc.cyan(`⏱ Scheduled [${pc.bold(jobName)}] runs at: ${cronExpression} (Rule: "${jobConfig.schedule}")${tzLabel}`));
   }
 }

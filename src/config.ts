@@ -11,12 +11,15 @@ export interface TaskConfig {
 
 export interface JobConfig {
   schedule?: string;
+  timezone?: string;
+  enabled?: boolean;
   notify_start?: boolean;
   notify_end?: boolean;
   tasks: TaskConfig[];
 }
 
 export interface TelecronConfig {
+  timezone?: string;
   telegram?: {
     bot_token: string;
     chat_id: string;
@@ -31,6 +34,22 @@ export function loadConfig(configPath: string): TelecronConfig {
   }
   const fileContent = fs.readFileSync(unresolvedPath, 'utf8');
   return yaml.parse(fileContent) as TelecronConfig;
+}
+
+export function toggleJob(configPath: string, jobName: string, enabled: boolean) {
+  const unresolvedPath = path.resolve(process.cwd(), configPath);
+  if (!fs.existsSync(unresolvedPath)) {
+    throw new Error(`Configuration file not found at: ${unresolvedPath}`);
+  }
+  const fileContent = fs.readFileSync(unresolvedPath, 'utf8');
+  const doc = yaml.parseDocument(fileContent);
+  
+  if (!doc.hasIn(['jobs', jobName])) {
+    throw new Error(`Job '${jobName}' not found in configuration.`);
+  }
+  
+  doc.setIn(['jobs', jobName, 'enabled'], enabled);
+  fs.writeFileSync(unresolvedPath, doc.toString(), 'utf8');
 }
 
 export function createDefaultConfig(targetPath: string) {
@@ -55,6 +74,10 @@ jobs:
     # (You can also still use standard CRON syntax like "0 2 * * *" if you prefer).
     # Leave empty or remove this line to disable automatic scheduling.
     schedule: "every day at 02:00" 
+    
+    # (Optional) Timezone for the schedule above. If missing, it defaults to your VM's system time.
+    # Supported formats: "Asia/Kolkata", "America/New_York", "Europe/London", etc.
+    timezone: "Asia/Kolkata"
 
     notify_start: true
     notify_end: true

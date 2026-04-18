@@ -26,7 +26,8 @@ export class TelegramNotifier {
       console.log(pc.green(`[Telegram] ✅ Notification sent successfully.`));
       return true;
     } catch (error: any) {
-      console.error(pc.red(`[Telegram] ❌ Failed to send message: ${error.message}`));
+      const reason = error.response?.data?.description || error.message;
+      console.error(pc.red(`[Telegram] ❌ Failed to send message: ${reason}`));
       return false;
     }
   }

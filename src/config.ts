@@ -7,6 +7,7 @@ export interface TaskConfig {
   command: string;
   cwd?: string;
   extract_log_regex?: string;
+  auto_retry?: number;
 }
 
 export interface JobConfig {
@@ -95,6 +96,10 @@ jobs:
         # (Optional) Regex to search in the final log file to extract a one-liner 
         # summary for your Telegram notification.
         extract_log_regex: "Batch complete.*"
+        
+        # (Optional) If the task fails natively (exit code > 0), retry this many times
+        # before permanently halting the pipeline and alerting Telegram.
+        auto_retry: 3
 
       # - name: "Data Processor"
       #   command: "npm run start"

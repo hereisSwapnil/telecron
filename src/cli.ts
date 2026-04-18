@@ -188,6 +188,47 @@ program
   });
 
 program
+  .command('clean')
+  .description('Wipe old sequential logs to free up disk space')
+  .option('-d, --days <number>', 'Amount of days to retain logs', '7')
+  .action((options) => {
+     try {
+         const daysToKeep = parseInt(options.days, 10);
+         const logsDir = path.resolve(process.cwd(), 'logs');
+         
+         if (!fs.existsSync(logsDir)) {
+             console.log(pc.yellow(`⚠️ Log directory (${logsDir}) does not exist yet.`));
+             return;
+         }
+
+         const cutoffMs = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
+         let deletedJobs = 0;
+         
+         const jobFolders = fs.readdirSync(logsDir);
+         for (const job of jobFolders) {
+            const jobPath = path.join(logsDir, job);
+            if (!fs.statSync(jobPath).isDirectory()) continue;
+            
+            const runs = fs.readdirSync(jobPath);
+            for (const run of runs) {
+               const runPath = path.join(jobPath, run);
+               if (!fs.statSync(runPath).isDirectory()) continue;
+               
+               const stats = fs.statSync(runPath);
+               if (stats.mtimeMs < cutoffMs) {
+                   fs.rmSync(runPath, { recursive: true, force: true });
+                   deletedJobs++;
+               }
+            }
+         }
+         
+         console.log(pc.green(`✅ Disk cleanup complete! Terminated ${deletedJobs} old execution logs.`));
+     } catch(err: any) {
+         console.error(pc.red(`❌ Failed to sweep old logs: ${err.message}`));
+     }
+  });
+
+program
   .command('run <jobName>')
   .description('Run a specific job once immediately (ignores cron schedule)')
   .option('-c, --config <path>', 'path to config file', 'telecron.yml')

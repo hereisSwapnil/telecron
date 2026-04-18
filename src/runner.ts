@@ -56,74 +56,90 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     console.log(pc.blue(`\n▶ [${i + 1}/${tasks.length}] Running: ${pc.bold(taskName)}`));
     console.log(pc.gray(`  $ ${task.command}`));
     
-    const logFilePath = path.join(logDir, `${String(i + 1).padStart(2, '0')}_${taskName.replace(/\s+/g, '_')}.log`);
-    
-    try {
-      const exitCode = await new Promise<number>((resolve, reject) => {
-        const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-        
-        const child = spawn(task.command, {
-          shell: true,
-          cwd: task.cwd ? path.resolve(process.cwd(), task.cwd) : process.cwd(),
-          env: process.env,
-        });
+    let exitCode = -1;
+    let attempts = 0;
+    let maxAttempts = (task.auto_retry || 0) + 1;
+    let taskDuration = "0s";
+    let logFilePath = "";
 
-        child.stdout?.pipe(logStream);
-        child.stderr?.pipe(logStream);
-        
-        child.stdout?.on('data', (data: Buffer) => process.stdout.write(pc.gray(data.toString())));
-        child.stderr?.on('data', (data: Buffer) => process.stderr.write(pc.red(data.toString())));
-
-        child.on('close', (code: number | null) => {
-          logStream.end();
-          resolve(code || 0);
-        });
-
-        child.on('error', (err: Error) => {
-          logStream.end();
-          reject(err);
-        });
-      });
-
-      const taskDuration = formatDuration(Date.now() - taskStartTime);
-
-      if (exitCode !== 0) {
-        const errMsg = `Task failed with exit code ${exitCode}`;
-        console.error(pc.red(`❌ ${errMsg}`));
-        const alertMsg = `❌ <b>Task Failed:</b> ${taskName}\nExit code: ${exitCode}\nDuration: ${taskDuration}\nCheck log: <code>${logFilePath}</code>`;
-        await notifier.sendMessage(alertMsg);
-        return; // Abort
-      }
-
-      console.log(pc.green(`✅ Finished ${taskName} in ${taskDuration}`));
+    while (attempts < maxAttempts && exitCode !== 0) {
+      attempts++;
+      logFilePath = path.join(logDir, `${String(i + 1).padStart(2, '0')}_${taskName.replace(/\s+/g, '_')}_try${attempts}.log`);
       
-      let extractedInfo = "Completed successfully.";
-      if (task.extract_log_regex) {
-        try {
-          const content = fs.readFileSync(logFilePath, 'utf8');
-          const regex = new RegExp(task.extract_log_regex, 'g');
-          let match;
-          let lastMatch = null;
-          while ((match = regex.exec(content)) !== null) {
-            lastMatch = match[0];
-          }
-          if (lastMatch) {
-            extractedInfo = lastMatch;
-          }
-        } catch (err: any) {
-          console.error(pc.yellow(`⚠️ Failed to extract regex from log: ${err.message}`));
-        }
+      if (attempts > 1) {
+          console.log(pc.yellow(`⚠️ Retry attempt ${attempts}/${maxAttempts} for ${taskName}...`));
       }
 
-      pipelineSummary.push(`✅ ${taskName} (<i>${taskDuration}</i>):\n<code>${extractedInfo}</code>`);
+      try {
+        exitCode = await new Promise<number>((resolve, reject) => {
+          const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+          
+          const child = spawn(task.command, {
+            shell: true,
+            cwd: task.cwd ? path.resolve(process.cwd(), task.cwd) : process.cwd(),
+            env: process.env,
+          });
 
-    } catch (err: any) {
-      const taskDuration = formatDuration(Date.now() - taskStartTime);
-      console.error(pc.red(`💥 Fatal error in ${taskName}: ${err.message}`));
-      const alertMsg = `❌ <b>Fatal Error:</b> ${taskName}\nDuration: ${taskDuration}\nException: ${err.message}`;
+          child.stdout?.pipe(logStream);
+          child.stderr?.pipe(logStream);
+          
+          child.stdout?.on('data', (data: Buffer) => process.stdout.write(pc.gray(data.toString())));
+          child.stderr?.on('data', (data: Buffer) => process.stderr.write(pc.red(data.toString())));
+
+          child.on('close', (code: number | null) => {
+            logStream.end();
+            resolve(code || 0);
+          });
+
+          child.on('error', (err: Error) => {
+            logStream.end();
+            reject(err);
+          });
+        });
+      } catch (err: any) {
+        if (attempts >= maxAttempts) {
+          const duration = formatDuration(Date.now() - taskStartTime);
+          console.error(pc.red(`💥 Fatal error natively spawning ${taskName}: ${err.message}`));
+          const alertMsg = `❌ <b>Fatal Spawn Error:</b> ${taskName}\nDuration: ${duration}\nException: ${err.message}`;
+          await notifier.sendMessage(alertMsg);
+          return; // Abort
+        }
+        exitCode = -1; // Force retry
+      }
+    }
+
+    taskDuration = formatDuration(Date.now() - taskStartTime);
+
+    if (exitCode !== 0) {
+      const errMsg = `Task failed with exit code ${exitCode} after ${attempts} attempts`;
+      console.error(pc.red(`❌ ${errMsg}`));
+      const alertMsg = `❌ <b>Task Failed:</b> ${taskName}\nExit code: ${exitCode}\nFinal Attempt: ${attempts}\nDuration: ${taskDuration}\nCheck log: <code>${logFilePath}</code>`;
       await notifier.sendMessage(alertMsg);
       return; // Abort
     }
+
+    console.log(pc.green(`✅ Finished ${taskName} in ${taskDuration}`));
+    
+    let extractedInfo = "Completed successfully.";
+    if (task.extract_log_regex) {
+      try {
+        const content = fs.readFileSync(logFilePath, 'utf8');
+        const regex = new RegExp(task.extract_log_regex, 'g');
+        let match;
+        let lastMatch = null;
+        while ((match = regex.exec(content)) !== null) {
+          lastMatch = match[0];
+        }
+        if (lastMatch) {
+          extractedInfo = lastMatch;
+        }
+      } catch (err: any) {
+        console.error(pc.yellow(`⚠️ Failed to extract regex from log: ${err.message}`));
+      }
+    }
+
+    pipelineSummary.push(`✅ ${taskName} (<i>${taskDuration}</i>):\n<code>${extractedInfo}</code>`);
+
   }
 
   const totalDuration = formatDuration(Date.now() - startTime);

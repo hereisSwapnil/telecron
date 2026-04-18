@@ -4,6 +4,7 @@ import path from 'path';
 import pc from 'picocolors';
 import { TelegramNotifier } from './notifier';
 import { JobConfig } from './config';
+import { jobEvents, JobEvents } from './events';
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -176,4 +177,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     const finalMsg = `🎊 <b>Pipeline Complete:</b> ${jobName}\n⏳ <b>Total Duration:</b> ${totalDuration}`;
     await notifier.sendMessage(finalMsg);
   }
+
+  // Emit success for chaining
+  jobEvents.emit(JobEvents.SUCCESS, jobName);
 }

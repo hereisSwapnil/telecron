@@ -16,6 +16,8 @@ export interface JobConfig {
   enabled?: boolean;
   notify_start?: boolean;
   notify_end?: boolean;
+  depends_on?: string | string[];
+  delay?: string;
   tasks: TaskConfig[];
 }
 

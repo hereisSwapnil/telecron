@@ -74,11 +74,24 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
         exitCode = await new Promise<number>((resolve, reject) => {
           const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
           
-          const child = spawn(task.command, {
+            const child = spawn(task.command, {
             shell: true,
             cwd: task.cwd ? path.resolve(process.cwd(), task.cwd) : process.cwd(),
             env: process.env,
+            // Detach children with their own process group so we can kill the whole tree
+            detached: true,
           });
+
+          const killChild = () => {
+             if (child.pid) {
+               try {
+                 process.kill(-child.pid, 'SIGTERM');
+               } catch (e) {}
+             }
+          };
+
+          process.on('SIGINT', killChild);
+          process.on('SIGTERM', killChild);
 
           child.stdout?.pipe(logStream);
           child.stderr?.pipe(logStream);
@@ -89,11 +102,15 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
           }
 
           child.on('close', (code: number | null) => {
+            process.off('SIGINT', killChild);
+            process.off('SIGTERM', killChild);
             logStream.end();
             resolve(code || 0);
           });
 
           child.on('error', (err: Error) => {
+            process.off('SIGINT', killChild);
+            process.off('SIGTERM', killChild);
             logStream.end();
             reject(err);
           });
@@ -126,14 +143,13 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     if (task.extract_log_regex) {
       try {
         const rawContent = fs.readFileSync(logFilePath, 'utf8');
-        // Strip out ANSI color codes for regex safety
         const content = rawContent.replace(/\x1b\[[0-9;]*m/g, ''); 
         
         const regex = new RegExp(task.extract_log_regex, 'g');
         let match;
         let lastMatch = null;
         while ((match = regex.exec(content)) !== null) {
-          lastMatch = match[1] ? match[1] : match[0]; // Prefer capture group over full match
+          lastMatch = match[1] ? match[1] : match[0];
         }
         if (lastMatch) {
           extractedInfo = lastMatch;
@@ -141,6 +157,12 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
       } catch (err: any) {
         console.error(pc.yellow(`⚠️ Failed to extract regex from log: ${err.message}`));
       }
+    }
+
+    // --- NEW: Per-task notification ---
+    if (jobConfig.notify_end !== false && tasks.length > 1) {
+      const taskMsg = `▶️ <b>Task Finished:</b> ${taskName}\n⏱ <b>Duration:</b> ${taskDuration}\n\n<code>${extractedInfo}</code>`;
+      await notifier.sendMessage(taskMsg);
     }
 
     pipelineSummary.push(`✅ ${taskName} (<i>${taskDuration}</i>):\n<code>${extractedInfo}</code>`);
@@ -151,7 +173,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
   console.log(pc.magenta(`\n🎉 Job success: ${jobName} (Total time: ${totalDuration})`));
 
   if (jobConfig.notify_end !== false) {
-    const finalMsg = `🎉 <b>Job Success:</b> ${jobName}\n⏱ <b>Total Time:</b> ${totalDuration}\n\n` + pipelineSummary.join('\n\n');
+    const finalMsg = `🎊 <b>Pipeline Complete:</b> ${jobName}\n⏳ <b>Total Duration:</b> ${totalDuration}`;
     await notifier.sendMessage(finalMsg);
   }
 }

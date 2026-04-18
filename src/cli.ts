@@ -139,8 +139,9 @@ program
      
      const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
      try {
-         process.kill(pid); 
-         console.log(pc.green(`🛑 Successfully terminated telecron background daemon (PID: ${pid}).`));
+         // Use -pid to kill the entire process group (daemon + all its tasks)
+         process.kill(-pid); 
+         console.log(pc.green(`🛑 Successfully terminated telecron daemon and all active tasks (Group PID: ${pid}).`));
      } catch (e: any) {
          if (e.code === 'ESRCH') {
              console.log(pc.yellow(`⚠️ PID ${pid} no longer exists. The daemon must have already stopped.`));

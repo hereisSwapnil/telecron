@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Compilation Artifacts
+dist/
+
+# Logs
+logs/
+*.log
+
+# Environment & Config
+.env
+telecron.yml

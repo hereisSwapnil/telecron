@@ -83,8 +83,10 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
           child.stdout?.pipe(logStream);
           child.stderr?.pipe(logStream);
           
-          child.stdout?.on('data', (data: Buffer) => process.stdout.write(pc.gray(data.toString())));
-          child.stderr?.on('data', (data: Buffer) => process.stderr.write(pc.red(data.toString())));
+          if (process.stdout.isTTY) {
+            child.stdout?.on('data', (data: Buffer) => process.stdout.write(pc.gray(data.toString())));
+            child.stderr?.on('data', (data: Buffer) => process.stderr.write(pc.red(data.toString())));
+          }
 
           child.on('close', (code: number | null) => {
             logStream.end();
@@ -123,12 +125,15 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     let extractedInfo = "Completed successfully.";
     if (task.extract_log_regex) {
       try {
-        const content = fs.readFileSync(logFilePath, 'utf8');
+        const rawContent = fs.readFileSync(logFilePath, 'utf8');
+        // Strip out ANSI color codes for regex safety
+        const content = rawContent.replace(/\x1b\[[0-9;]*m/g, ''); 
+        
         const regex = new RegExp(task.extract_log_regex, 'g');
         let match;
         let lastMatch = null;
         while ((match = regex.exec(content)) !== null) {
-          lastMatch = match[0];
+          lastMatch = match[1] ? match[1] : match[0]; // Prefer capture group over full match
         }
         if (lastMatch) {
           extractedInfo = lastMatch;

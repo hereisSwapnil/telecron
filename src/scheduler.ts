@@ -77,7 +77,7 @@ export function startScheduler(config: TelecronConfig) {
 
     cron.schedule(cronExpression, async () => {
       try {
-        await runJob(jobName, jobConfig, notifier);
+        await runJob(jobName, jobConfig, notifier, config.timezone);
       } catch (err: any) {
         console.error(pc.red(`Unhandled error in job scheduler for ${jobName}: ${err.message}`));
       }

@@ -14,13 +14,29 @@ function formatDuration(ms: number): string {
   return `${mins}m ${remSecs}s`;
 }
 
-export async function runJob(jobName: string, jobConfig: JobConfig, notifier: TelegramNotifier) {
+export async function runJob(jobName: string, jobConfig: JobConfig, notifier: TelegramNotifier, globalTimezone?: string) {
   const startTime = Date.now();
   console.log(pc.cyan(`\n🚀 Starting job: ${pc.bold(jobName)}`));
+  const tz = jobConfig.timezone || globalTimezone;
 
   if (jobConfig.notify_start) {
-    const timeStr = new Date().toISOString().replace('T', ' ').split('.')[0];
-    await notifier.sendMessage(`🚀 <b>Job Started:</b> ${jobName}\nTime: ${timeStr} UTC`);
+    let timeStr = '';
+    if (tz) {
+      try {
+        timeStr = new Intl.DateTimeFormat('en-US', { 
+            timeZone: tz, 
+            month: 'long', day: 'numeric', year: 'numeric', 
+            hour: 'numeric', minute: '2-digit', hour12: true
+        }).format(new Date());
+        timeStr += ` (${tz})`;
+      } catch (e) {
+        timeStr = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+      }
+    } else {
+      timeStr = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+    }
+    
+    await notifier.sendMessage(`🚀 <b>Job Started:</b> ${jobName}\nTime: ${timeStr}`);
   }
 
   // Set up logs directory for this run

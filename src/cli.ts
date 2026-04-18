@@ -154,6 +154,40 @@ program
   });
 
 program
+  .command('restart')
+  .description('Restart the background telecron daemon (Reloads configuration)')
+  .option('-c, --config <path>', 'path to config file', 'telecron.yml')
+  .action((options) => {
+     const pidFile = path.resolve(process.cwd(), '.telecron.pid');
+     
+     // 1. Terminate old process
+     if (fs.existsSync(pidFile)) {
+         const oldPid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
+         try {
+             process.kill(oldPid);
+             console.log(pc.yellow(`🛑 Terminated existing daemon (PID: ${oldPid}).`));
+         } catch (e: any) {
+             // Ignore ESRCH, process already dead
+         }
+         try { fs.unlinkSync(pidFile); } catch(e) {}
+     }
+
+     // 2. Launch new detached process
+     const logStream = fs.openSync(path.resolve(process.cwd(), 'telecron-daemon.log'), 'a');
+     const child = spawn(process.execPath, [__filename, 'start', '-c', options.config, '--foreground'], {
+         detached: true,
+         stdio: ['ignore', logStream, logStream]
+     });
+     
+     child.unref(); 
+     fs.writeFileSync(pidFile, String(child.pid), 'utf8');
+     
+     console.log(pc.green(`🔄 Telecron daemon immediately rebooted in the background (New PID: ${child.pid}).`));
+     console.log(pc.cyan(`Next steps: You can safely close this terminal.`));
+     process.exit(0);
+  });
+
+program
   .command('run <jobName>')
   .description('Run a specific job once immediately (ignores cron schedule)')
   .option('-c, --config <path>', 'path to config file', 'telecron.yml')
@@ -168,7 +202,7 @@ program
       const telegram = config.telegram || { bot_token: '', chat_id: '' };
       const notifier = new TelegramNotifier(telegram.bot_token, telegram.chat_id);
       
-      await runJob(jobName, jobDef, notifier);
+      await runJob(jobName, jobDef, notifier, config.timezone);
     } catch (err: any) {
       console.error(pc.red(`❌ Execution failed: ${err.message}`));
       process.exit(1);

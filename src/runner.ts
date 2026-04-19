@@ -28,8 +28,9 @@ function parseTimeoutToMs(text: string): number {
 }
 
 export async function runJob(jobName: string, jobConfig: JobConfig, notifier: TelegramNotifier, globalTimezone?: string) {
+  const displayName = jobConfig.name || jobName;
   const startTime = Date.now();
-  console.log(pc.cyan(`\n🚀 Starting job: ${pc.bold(jobName)}`));
+  console.log(pc.cyan(`\n🚀 Starting job: ${pc.bold(displayName)}`));
   const tz = jobConfig.timezone || globalTimezone;
 
   if (jobConfig.notify_start) {
@@ -40,7 +41,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
             timeZone: tz, 
             month: 'long', day: 'numeric', year: 'numeric', 
             hour: 'numeric', minute: '2-digit', hour12: true
-        }).format(new Date());
+        }).format(new Date()).replace(',', ' at');
         timeStr += ` (${tz})`;
       } catch (e) {
         timeStr = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
@@ -49,7 +50,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
       timeStr = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
     }
     
-    await notifier.sendMessage(`🚀 <b>Job Started:</b> ${jobName}\nTime: ${timeStr}`);
+    await notifier.sendMessage(`<b>Name:</b> ${displayName}\n<b>Status:</b> 🚀 Starting Pipeline\n<b>Date/Time:</b> ${timeStr}\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`);
   }
 
   // Set up logs directory for this run
@@ -111,7 +112,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
             const ms = parseTimeoutToMs(task.timeout);
             if (ms > 0) {
               timeoutTimer = setTimeout(() => {
-                console.log(pc.yellow(`\\n⏱️ Task timeout reached (${task.timeout}). Killing...`));
+                console.log(pc.yellow(`\n⏱️ Task timeout reached (${task.timeout}). Killing...`));
                 killChild();
               }, ms);
             }
@@ -147,7 +148,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
         if (attempts >= maxAttempts) {
           const duration = formatDuration(Date.now() - taskStartTime);
           console.error(pc.red(`💥 Fatal error natively spawning ${taskName}: ${err.message}`));
-          const alertMsg = `❌ <b>Fatal Spawn Error:</b> ${taskName}\nDuration: ${duration}\nException: ${err.message}`;
+          const alertMsg = `<b>Name:</b> ${displayName} (${taskName})\n<b>Status:</b> 💥 Fatal Spawn Error\n<b>Duration:</b> ${duration}\n<b>Exception:</b> ${err.message}\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`;
           await notifier.sendMessage(alertMsg);
           jobEvents.emit(JobEvents.FAILURE, jobName);
           return; // Abort
@@ -161,7 +162,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     if (exitCode !== 0) {
       const errMsg = `Task failed with exit code ${exitCode} after ${attempts} attempts`;
       console.error(pc.red(`❌ ${errMsg}`));
-      const alertMsg = `❌ <b>Task Failed:</b> ${taskName}\nExit code: ${exitCode}\nFinal Attempt: ${attempts}\nDuration: ${taskDuration}\nCheck log: <code>${logFilePath}</code>`;
+      const alertMsg = `<b>Name:</b> ${taskName}\n<b>Status:</b> 🛑 Task Failed (Exit ${exitCode}, Attempt ${attempts})\n<b>Duration:</b> ${taskDuration}\n<b>Check Log:</b> <code>${logFilePath}</code>\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`;
       await notifier.sendMessage(alertMsg);
       jobEvents.emit(JobEvents.FAILURE, jobName);
       return; // Abort
@@ -182,16 +183,16 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
           lastMatch = match[1] ? match[1] : match[0];
         }
         if (lastMatch) {
-          extractedInfo = lastMatch;
+          const MAX_EMBED_LEN = 2000;
+          extractedInfo = lastMatch.length > MAX_EMBED_LEN ? lastMatch.slice(0, MAX_EMBED_LEN) + '\n…(truncated log)' : lastMatch;
         }
       } catch (err: any) {
         console.error(pc.yellow(`⚠️ Failed to extract regex from log: ${err.message}`));
       }
     }
 
-    // --- NEW: Per-task notification ---
     if (jobConfig.notify_end !== false && tasks.length > 1) {
-      const taskMsg = `▶️ <b>Task Finished:</b> ${taskName}\n⏱ <b>Duration:</b> ${taskDuration}\n\n<code>${extractedInfo}</code>`;
+      const taskMsg = `<b>Name:</b> ${taskName}\n<b>Status:</b> ▶️ Task Finished\n<b>Duration:</b> ${taskDuration}\n\n<code>${extractedInfo}</code>\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`;
       await notifier.sendMessage(taskMsg);
     }
 
@@ -200,10 +201,16 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
   }
 
   const totalDuration = formatDuration(Date.now() - startTime);
-  console.log(pc.magenta(`\n🎉 Job success: ${jobName} (Total time: ${totalDuration})`));
+  console.log(pc.magenta(`\n🎉 Job success: ${displayName} (Total time: ${totalDuration})`));
 
   if (jobConfig.notify_end !== false) {
-    const finalMsg = `🎊 <b>Pipeline Complete:</b> ${jobName}\n⏳ <b>Total Duration:</b> ${totalDuration}`;
+    const summaryText = pipelineSummary.length > 0 
+      ? `\n\n${pipelineSummary.map(s => {
+          const splitIdx = s.indexOf(':\n');
+          return splitIdx !== -1 ? s.substring(splitIdx + 2) : s;
+        }).join('\n\n')}` 
+      : '';
+    const finalMsg = `<b>Name:</b> ${displayName}\n<b>Status:</b> ✅ Pipeline Success\n<b>Duration:</b> ${totalDuration}${summaryText}\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`;
     await notifier.sendMessage(finalMsg);
   }
 

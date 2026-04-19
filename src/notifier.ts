@@ -25,6 +25,7 @@ export class TelegramNotifier {
         chat_id: this.chatId,
         text: safeText,
         parse_mode: 'HTML',
+        disable_web_page_preview: true
       });
       console.log(pc.green(`[Telegram] ✅ Notification sent successfully.`));
       return true;

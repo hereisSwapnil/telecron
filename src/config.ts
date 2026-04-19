@@ -12,6 +12,7 @@ export interface TaskConfig {
 }
 
 export interface JobConfig {
+  name?: string;
   schedule?: string;
   timezone?: string;
   enabled?: boolean;

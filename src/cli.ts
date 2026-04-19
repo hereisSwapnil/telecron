@@ -9,6 +9,7 @@ import { loadConfig, createDefaultConfig, toggleJob } from './config';
 import { startScheduler } from './scheduler';
 import { runJob } from './runner';
 import { TelegramNotifier } from './notifier';
+import { startInteractiveConfig } from './configure';
 
 const program = new Command();
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
@@ -30,6 +31,19 @@ program
     createDefaultConfig(targetPath);
     console.log(pc.green(`✅ Created default configuration at ${targetPath}`));
     console.log(pc.cyan(`Next steps: Edit the file, configure your Telegram credentials, and define your jobs.`));
+  });
+
+program
+  .command('configure')
+  .description('Interactively configure jobs and settings via a visual terminal UI')
+  .option('-c, --config <path>', 'path to config file', 'telecron.yml')
+  .action(async (options) => {
+    try {
+      await startInteractiveConfig(options.config);
+    } catch (err: any) {
+      console.error(pc.red(`❌ Configuration failed: ${err.message}`));
+      process.exit(1);
+    }
   });
 
 program

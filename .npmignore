@@ -1,0 +1,17 @@
+# Logs and runtime files
+logs/
+telecron-daemon.log
+.telecron.pid
+*.log
+
+# Development files
+src/
+tsconfig.json
+node_modules/
+.git/
+.gitignore
+.DS_Store
+
+# Artifacts
+Agents.md
+telecron.yml

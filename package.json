@@ -1,16 +1,34 @@
 {
   "name": "telecron",
-  "version": "1.0.0",
-  "description": "A production-grade job runner with native Telegram notifications",
+  "version": "1.1.0",
+  "description": "Orchestrate pipelines, schedule jobs, and receive intelligent stats directly on Telegram.",
   "main": "dist/cli.js",
   "bin": {
     "telecron": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepare": "npm run build"
   },
-  "author": "Antigravity",
+  "keywords": [
+    "task-runner",
+    "cron",
+    "automation",
+    "telegram",
+    "scheduler",
+    "pipeline",
+    "devops",
+    "nodejs",
+    "orchestrator"
+  ],
+  "author": "Swapnil",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.15.0",
@@ -28,3 +46,4 @@
     "typescript": "^5.7.3"
   }
 }
+

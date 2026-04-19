@@ -1,85 +1,95 @@
-# Telecron (Task-Runner)
+<h1 align="center">Telecron</h1>
 
-A production-grade job runner CLI powered by Node.js. Define sequential CLI tasks mapped to cron expressions via an elegant YAML configuration file, capture the exact elapsed time for each pipeline block, extract insights using Regex, and stream rich HTML updates to your Telegram bot natively.
+<p align="center">
+  <strong>The missing link between your scripts and your pocket.</strong><br>
+  Stop watching terminals. Real-time orchestration, human-first scheduling, and intelligent feedback—delivered directly to Telegram.
+</p>
 
-## Installation
+<p align="center">
+  <a href="https://www.npmjs.com/package/telecron"><img src="https://img.shields.io/npm/v/telecron.svg?style=flat-square&color=007bff" alt="NPM Version"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-333333.svg?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-00c853.svg?style=flat-square" alt="Node Version">
+</p>
 
-Install globally on your system so you can execute `telecron` anywhere:
+---
+
+## Why Telecron?
+
+Most cron jobs are "fire and forget"—until they fail silently. **Telecron** turns your background tasks into interactive shared experiences. It’s built for developers who need to chain complex logic, extract meaningful data from logs, and get notified the second something moves.
+
+### ✦ Automation that talks back
+Get rich HTML updates on your phone. Whether it's a successful extraction or a pipeline crash, you'll know exactly what happened and how long it took.
+
+### ✦ Because you don't speak `* * * * *`
+Schedule jobs using phrases you actually understand. `every day at 04:00` or `every 30 minutes`. Telecron handles the translation so you can focus on the logic.
+
+### ✦ Pipelines without the "Glue"
+Stop writing nested shell scripts to handle dependencies. Chain jobs together in YAML: *run the scraper, then the analyzer, then the backup.* One fails? The chain stops and alerts you.
+
+### ✦ Deep Insights, Zero Effort
+Telecron doesn't just run commands; it reads them. Use Regex to pull key stats from your logs (e.g., "Articles Scraped: 142") and display them in your Telegram notification automatically.
+
+---
+
+## 🚦 Quick Start
+
+### 1. Grab the CLI
 ```bash
-npm install
-npm run build
-npm link
+npm install -g telecron
 ```
-*(If you do not want to install it globally, navigate to the folder and use `npx telecron`).*
 
-## Quick Start
-1. **Initialize configuration**
-   ```bash
-   telecron init
-   ```
-   This generates a `telecron.yml` file gracefully in your current directory.
+### 2. Initialize & Configure
+```bash
+telecron init          # Generate your telecron.yml
+telecron configure     # Visual UI to tweak your jobs
+```
 
-2. **Configure your Telegram Keys**
-   Get your bot token from BotFather and find your Chat ID. Under the `telegram:` section, fill them in safely.
+### 3. Launch the Hub
+Keep the daemon running in the background. It manages the clock and your tasks silently.
+```bash
+telecron start
+```
 
-3. **Start the daemon**
-   Keep this running in `tmux`, `screen`, or a Systemd file block.
-   ```bash
-   telecron start
-   ```
+---
 
-4. **Trigger Manually**
-   ```bash
-   telecron run my_pipeline
-   ```
-
-## Configuration Examples (`telecron.yml`)
-
-### Human-Readable Schedules
-Telecron magically translates human strings into valid CRON constraints behind the scenes!
+## 📋 The "Product-First" Config
 
 ```yaml
+# telecron.yml
 jobs:
-  daily_sync:
-    schedule: "every day at 02:00"  # Translates to "0 2 * * *"
+  daily_intelligence:
+    schedule: "every day at 02:00"
     notify_end: true
     tasks:
-      - name: "Database Backup"
-        command: "pg_dump -U postgres > backup.sql"
-```
-
-```yaml
-jobs:
-  hourly_ping:
-    schedule: "every hour"  # Translates to "0 * * * *"
-    tasks: 
-      - name: "Network check"
-        command: "ping -c 4 8.8.8.8"
-```
-
-### Complex Sequential Pipelines
-If a single task crashes, the pipeline successfully halts and instantly fires an emergency notification. Because Telecron accepts explicit `cwd` definitions, you can trigger processes spanning your entire computer.
-
-```yaml
-jobs:
-  data_pipeline:
-    schedule: "every day at 04:00"  # Or standard cron like "0 4 * * *"
-    notify_start: true
-    notify_end: true
-    tasks:
-      - name: "Data Extraction"
-        command: "npm run extract"
-        cwd: "/path/to/extracted/module"
-        extract_log_regex: "Success.*"   # Automatically extracts the completion summary from the log output dynamically for Telegram!
+      - name: "Web Scraper"
+        command: "npm start"
+        cwd: "./agents/scraper"
+        extract_log_regex: "Success: (\\d+) items" # Stats sent to Telegram!
         
-      - name: "Data Transformation"
-        command: "python3 transform.py"
-        cwd: "/path/to/transformation/module"
-        
-      - name: "Final Validation"
-        command: "pytest tests/"
-        cwd: "/path/to/validation/module"
+      - name: "AI Classifier"
+        command: "python3 main.py"
+        cwd: "./agents/ai"
 ```
 
-## Logs & Transparency
-Instead of obfuscated shell execution, `telecron` beautifully streams Standard Out and Error right to your terminal concurrently while dumping full `.log` files cleanly to dynamic `logs/<job_name>/<timestamp>` directories. You never lose execution history!
+---
+
+## 💻 CLI Tools
+
+| Command              | Purpose                                           |
+| :------------------- | :------------------------------------------------ |
+| `init` / `configure` | Setup your environment and visual job management. |
+| `start` / `stop`     | Manage the background engine.                     |
+| `run <job>`          | Trigger a pipeline manually (skip the clock).     |
+| `list`               | See what’s scheduled and what’s disabled.         |
+| `clean`              | Wipe old logs and keep your server lean.          |
+
+---
+
+## ⚖️ License
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
+
+---
+
+<p align="center">
+  Built for developers who value their time and their notifications.
+</p>

@@ -15,6 +15,18 @@ function formatDuration(ms: number): string {
   return `${mins}m ${remSecs}s`;
 }
 
+function parseTimeoutToMs(text: string): number {
+  const match = text.trim().toLowerCase().match(/^(\d+)\s*(ms|millisecond|s|sec|second|m|min|minute|h|hour)s?$/);
+  if (!match) return 0;
+  const val = parseInt(match[1], 10);
+  const unit = match[2];
+  if (unit.startsWith('ms') || unit.startsWith('milli')) return val;
+  if (unit.startsWith('s')) return val * 1000;
+  if (unit.startsWith('m')) return val * 60 * 1000;
+  if (unit.startsWith('h')) return val * 60 * 60 * 1000;
+  return 0;
+}
+
 export async function runJob(jobName: string, jobConfig: JobConfig, notifier: TelegramNotifier, globalTimezone?: string) {
   const startTime = Date.now();
   console.log(pc.cyan(`\n🚀 Starting job: ${pc.bold(jobName)}`));
@@ -91,8 +103,25 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
              }
           };
 
-          process.on('SIGINT', killChild);
-          process.on('SIGTERM', killChild);
+          process.once('SIGINT', killChild);
+          process.once('SIGTERM', killChild);
+
+          let timeoutTimer: NodeJS.Timeout | null = null;
+          if (task.timeout) {
+            const ms = parseTimeoutToMs(task.timeout);
+            if (ms > 0) {
+              timeoutTimer = setTimeout(() => {
+                console.log(pc.yellow(`\\n⏱️ Task timeout reached (${task.timeout}). Killing...`));
+                killChild();
+              }, ms);
+            }
+          }
+
+          const cleanup = () => {
+            process.off('SIGINT', killChild);
+            process.off('SIGTERM', killChild);
+            if (timeoutTimer) clearTimeout(timeoutTimer);
+          };
 
           child.stdout?.pipe(logStream);
           child.stderr?.pipe(logStream);
@@ -103,15 +132,13 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
           }
 
           child.on('close', (code: number | null) => {
-            process.off('SIGINT', killChild);
-            process.off('SIGTERM', killChild);
+            cleanup();
             logStream.end();
-            resolve(code || 0);
+            resolve(code ?? 1);
           });
 
           child.on('error', (err: Error) => {
-            process.off('SIGINT', killChild);
-            process.off('SIGTERM', killChild);
+            cleanup();
             logStream.end();
             reject(err);
           });
@@ -122,6 +149,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
           console.error(pc.red(`💥 Fatal error natively spawning ${taskName}: ${err.message}`));
           const alertMsg = `❌ <b>Fatal Spawn Error:</b> ${taskName}\nDuration: ${duration}\nException: ${err.message}`;
           await notifier.sendMessage(alertMsg);
+          jobEvents.emit(JobEvents.FAILURE, jobName);
           return; // Abort
         }
         exitCode = -1; // Force retry
@@ -135,6 +163,7 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
       console.error(pc.red(`❌ ${errMsg}`));
       const alertMsg = `❌ <b>Task Failed:</b> ${taskName}\nExit code: ${exitCode}\nFinal Attempt: ${attempts}\nDuration: ${taskDuration}\nCheck log: <code>${logFilePath}</code>`;
       await notifier.sendMessage(alertMsg);
+      jobEvents.emit(JobEvents.FAILURE, jobName);
       return; // Abort
     }
 

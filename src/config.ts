@@ -8,6 +8,7 @@ export interface TaskConfig {
   cwd?: string;
   extract_log_regex?: string;
   auto_retry?: number;
+  timeout?: string;  // e.g. "5 minutes", "30 seconds", "2 hours"
 }
 
 export interface JobConfig {
@@ -36,7 +37,11 @@ export function loadConfig(configPath: string): TelecronConfig {
     throw new Error(`Configuration file not found at: ${unresolvedPath}`);
   }
   const fileContent = fs.readFileSync(unresolvedPath, 'utf8');
-  return yaml.parse(fileContent) as TelecronConfig;
+  try {
+    return yaml.parse(fileContent) as TelecronConfig;
+  } catch (err: any) {
+    throw new Error(`Invalid YAML in ${unresolvedPath}: ${err.message}`);
+  }
 }
 
 export function toggleJob(configPath: string, jobName: string, enabled: boolean) {

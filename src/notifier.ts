@@ -18,9 +18,12 @@ export class TelegramNotifier {
 
     try {
       const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+      const MAX_TG_LEN = 4000;
+      const safeText = text.length > MAX_TG_LEN ? text.slice(0, MAX_TG_LEN) + '\\n…(truncated)' : text;
+
       await axios.post(url, {
         chat_id: this.chatId,
-        text: text,
+        text: safeText,
         parse_mode: 'HTML',
       });
       console.log(pc.green(`[Telegram] ✅ Notification sent successfully.`));

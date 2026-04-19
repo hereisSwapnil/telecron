@@ -1,10 +1,10 @@
 {
-  "name": "telecron",
+  "name": "@hereisswapnil/telecron",
   "version": "1.1.0",
   "description": "Orchestrate pipelines, schedule jobs, and receive intelligent stats directly on Telegram.",
   "main": "dist/cli.js",
   "bin": {
-    "telecron": "./dist/cli.js"
+    "telecron": "dist/cli.js"
   },
   "files": [
     "dist",

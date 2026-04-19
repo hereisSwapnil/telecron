@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/telecron"><img src="https://img.shields.io/npm/v/telecron.svg?style=flat-square&color=007bff" alt="NPM Version"></a>
+  <a href="https://www.npmjs.com/package/@hereisswapnil/telecron"><img src="https://img.shields.io/npm/v/@hereisswapnil/telecron.svg?style=flat-square&color=007bff" alt="NPM Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-333333.svg?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-00c853.svg?style=flat-square" alt="Node Version">
 </p>
@@ -35,7 +35,7 @@ Telecron doesn't just run commands; it reads them. Use Regex to pull key stats f
 
 ### 1. Grab the CLI
 ```bash
-npm install -g telecron
+npm install -g @hereisswapnil/telecron
 ```
 
 ### 2. Initialize & Configure

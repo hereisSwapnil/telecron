@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import pc from 'picocolors';
 import { TelegramNotifier } from './notifier';
-import { JobConfig } from './config';
+import { JobConfig, getGlobalLogDir } from './config';
 import { jobEvents, JobEvents } from './events';
 
 function formatDuration(ms: number): string {
@@ -53,9 +53,9 @@ export async function runJob(jobName: string, jobConfig: JobConfig, notifier: Te
     await notifier.sendMessage(`<b>Name:</b> ${displayName}\n<b>Status:</b> 🚀 Starting Pipeline\n<b>Date/Time:</b> ${timeStr}\n\n<i>by <a href="https://github.com/hereisSwapnil/telecron">telecron</a></i>`);
   }
 
-  // Set up logs directory for this run
+  // Set up logs directory for this run (Centralized in Global-Only model)
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logDir = path.resolve(process.cwd(), 'logs', jobName, timestamp);
+  const logDir = path.resolve(getGlobalLogDir(), jobName, timestamp);
   fs.mkdirSync(logDir, { recursive: true });
   console.log(pc.gray(`📁 Logs routing to: ${logDir}`));
 

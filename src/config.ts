@@ -1,6 +1,7 @@
 import fs from 'fs';
 import yaml from 'yaml';
 import path from 'path';
+import os from 'os';
 
 export interface TaskConfig {
   name: string;
@@ -32,25 +33,47 @@ export interface TelecronConfig {
   jobs: Record<string, JobConfig>;
 }
 
-export function loadConfig(configPath: string): TelecronConfig {
-  const unresolvedPath = path.resolve(process.cwd(), configPath);
-  if (!fs.existsSync(unresolvedPath)) {
-    throw new Error(`Configuration file not found at: ${unresolvedPath}`);
+export function getGlobalConfigPath(): string {
+  return path.resolve(os.homedir(), '.telecron.yml');
+}
+
+export function getGlobalLogDir(): string {
+  const dir = path.resolve(os.homedir(), '.telecron', 'logs');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  const fileContent = fs.readFileSync(unresolvedPath, 'utf8');
+  return dir;
+}
+
+/**
+ * Resolves the configuration path to the global ~/.telecron.yml.
+ * Enforces centralized management as per user requirements.
+ */
+export function resolveConfigPath(specifiedPath?: string): string {
+  if (specifiedPath && specifiedPath !== 'telecron.yml') {
+    return path.resolve(process.cwd(), specifiedPath);
+  }
+
+  return getGlobalConfigPath();
+}
+
+export function loadConfig(resolvedPath: string): TelecronConfig {
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Configuration file not found at: ${resolvedPath}`);
+  }
+  const fileContent = fs.readFileSync(resolvedPath, 'utf8');
   try {
     return yaml.parse(fileContent) as TelecronConfig;
   } catch (err: any) {
-    throw new Error(`Invalid YAML in ${unresolvedPath}: ${err.message}`);
+    throw new Error(`Invalid YAML in ${resolvedPath}: ${err.message}`);
   }
 }
 
-export function toggleJob(configPath: string, jobName: string, enabled: boolean) {
-  const unresolvedPath = path.resolve(process.cwd(), configPath);
-  if (!fs.existsSync(unresolvedPath)) {
-    throw new Error(`Configuration file not found at: ${unresolvedPath}`);
+export function toggleJob(resolvedPath: string, jobName: string, enabled: boolean) {
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Configuration file not found at: ${resolvedPath}`);
   }
-  const fileContent = fs.readFileSync(unresolvedPath, 'utf8');
+  const fileContent = fs.readFileSync(resolvedPath, 'utf8');
   const doc = yaml.parseDocument(fileContent);
   
   if (!doc.hasIn(['jobs', jobName])) {
@@ -58,7 +81,7 @@ export function toggleJob(configPath: string, jobName: string, enabled: boolean)
   }
   
   doc.setIn(['jobs', jobName, 'enabled'], enabled);
-  fs.writeFileSync(unresolvedPath, doc.toString(), 'utf8');
+  fs.writeFileSync(resolvedPath, doc.toString(), 'utf8');
 }
 
 export function createDefaultConfig(targetPath: string) {
@@ -66,8 +89,24 @@ export function createDefaultConfig(targetPath: string) {
 # Telecron Configuration File
 # ==========================================
 
-telegram: {}
-jobs: {}
+telegram:
+  bot_token: ""
+  chat_id: ""
+
+jobs:
+  ping_example:
+    name: "Heartbeat check"
+    schedule: "every minute"
+    tasks:
+      - name: "Google Ping"
+        command: "ping -c 4 8.8.8.8"
 `;
+  
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
   fs.writeFileSync(targetPath, defaultConfig, 'utf8');
 }
+
